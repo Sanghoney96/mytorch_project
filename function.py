@@ -17,12 +17,13 @@ class Function:
             ys = (ys,)
         outputs = [Variable(as_array(y)) for y in ys]
 
-        self.generation = max([x.generation for x in inputs])
-        for output in outputs:
-            output.set_creator(self)
+        if Config.enable_backprop:
+            self.generation = max([x.generation for x in inputs])
+            for output in outputs:
+                output.set_creator(self)
 
-        self.inputs = inputs
-        self.outputs = [weakref.ref(output) for output in outputs]
+            self.inputs = inputs
+            self.outputs = [weakref.ref(output) for output in outputs]
 
         return outputs if len(outputs) > 1 else outputs[0]
 
@@ -31,6 +32,23 @@ class Function:
 
     def backward(self, *dys):
         raise NotImplementedError()
+
+
+class Config:
+    enable_backprop = True
+
+
+def using_config(name, value):
+    old_value = getattr(Config, name)
+    setattr(Config, name, value)
+    try:
+        yield
+    finally:
+        setattr(Config, name, old_value)
+
+
+def no_grad():
+    return using_config("enable_backprop", False)
 
 
 """
@@ -147,10 +165,14 @@ def add(x0, x1):
 
 # test backward
 
-x0 = Variable(np.array(2.0))
-a = square(x0)
-y = add(square(a), square(a))
+x0 = Variable(np.array(2))
+x1 = Variable(np.array(3))
+y = add(x0, x1)
 y.backward()
 
-print(y.data)
+print(y.grad)
 print(x0.grad)
+
+with no_grad():
+    y = add(x0, x1)
+    y.backward()

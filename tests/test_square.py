@@ -5,8 +5,8 @@ import sys, os
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
-from core import Variable, square
-from utils import numerical_grad
+from mytorch import Variable, square
+from utils4test import numerical_grad
 
 
 class SquareTest(unittest.TestCase):

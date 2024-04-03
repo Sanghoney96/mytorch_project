@@ -1,8 +1,9 @@
-import os, sys
+if "__file__" in globals():
+    import os, sys
 
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from core import Variable
+from mytorch import Variable
 
 
 def numerical_grad(func, x, eps=1e-4):

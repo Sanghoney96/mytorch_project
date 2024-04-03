@@ -1,5 +1,4 @@
 import numpy as np
-from utils import as_array
 import weakref
 
 
@@ -46,17 +45,35 @@ class Variable:
         p = str(self.data).replace("\n", "\n" + " " * 9)
         return f"variable({p})"
 
+    def __add__(self, other):
+        return add(self, other)
+
+    def __radd__(self, other):
+        return add(self, other)
+
     def __mul__(self, other):
         return mul(self, other)
 
     def __rmul__(self, other):
         return mul(self, other)
 
-    def __add__(self, other):
-        return add(self, other)
+    def __sub__(self, other):
+        return sub(self, other)
 
-    def __radd__(self, other):
-        return add(self, other)
+    def __rsub__(self, other):
+        return sub(other, self)
+
+    def __truediv__(self, other):
+        return div(self, other)
+
+    def __rtruediv__(self, other):
+        return div(other, self)
+
+    def __pow__(self, other):
+        return pow(self, other)
+
+    def __neg__(self):
+        return neg(self)
 
     def set_creator(self, func):
         self.creator = func
@@ -110,6 +127,12 @@ def as_variable(obj):
         return Variable(obj)
 
 
+def as_array(x):
+    if np.isscalar(x):
+        return np.array(x)
+    return x
+
+
 """
 Function : Base class of functions
 """
@@ -159,7 +182,7 @@ def no_grad():
 
 
 """
-Implemented operations
+Operations : Add, Mul, Neg, Sub, Div, Square, Pow
 """
 
 
@@ -194,6 +217,71 @@ class Mul(Function):
 def mul(x0, x1):
     x1 = as_array(x1)
     return Mul()(x0, x1)
+
+
+class Neg(Function):
+    def forward(self, x):
+        return -x
+
+    def backward(self, dy):
+        return -dy
+
+
+def neg(x):
+    x = as_array(x)
+    return Neg()(x)
+
+
+class Sub(Function):
+    def forward(self, x0, x1):
+        y = x0 - x1
+        return y
+
+    def backward(self, dy):
+        dx0 = dy
+        dx1 = -dy
+        return dx0, dx1
+
+
+def sub(x0, x1):
+    x0, x1 = as_array(x0), as_array(x1)
+    return Sub()(x0, x1)
+
+
+class Div(Function):
+    def forward(self, x0, x1):
+        y = x0 / x1
+        return y
+
+    def backward(self, dy):
+        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        dx0 = dy / x1
+        dx1 = -dy * (x0 / x1**2)
+        return dx0, dx1
+
+
+def div(x0, x1):
+    x0, x1 = as_array(x0), as_array(x1)
+    return Div()(x0, x1)
+
+
+class Pow(Function):
+    def __init__(self, c):
+        self.c = c
+
+    def forward(self, x):
+        y = x**self.c
+        return y
+
+    def backward(self, dy):
+        x = self.inputs[0].data
+        dx = dy * (self.c * x ** (self.c - 1))
+        return dx
+
+
+def pow(x, c):
+    x = as_array(x)
+    return Pow(c)(x)
 
 
 class Square(Function):
@@ -277,8 +365,3 @@ class ReLU(Function):
 
 def relu(x):
     return ReLU()(x)
-
-
-a = Variable(np.array(3.0))
-y = 2 * a + 1
-print(y)

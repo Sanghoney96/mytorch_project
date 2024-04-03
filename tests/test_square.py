@@ -5,8 +5,7 @@ import sys, os
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
-from variable import Variable
-from function import square
+from core import Variable, square
 from utils import numerical_grad
 
 

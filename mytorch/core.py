@@ -1,5 +1,6 @@
 import numpy as np
 import weakref
+from contextlib import contextmanager
 
 
 """
@@ -168,6 +169,7 @@ class Config:
     enable_backprop = True
 
 
+@contextmanager
 def using_config(name, value):
     old_value = getattr(Config, name)
     setattr(Config, name, value)

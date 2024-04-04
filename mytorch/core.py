@@ -209,8 +209,8 @@ class Mul(Function):
 
     def backward(self, dy):
         x0, x1 = self.inputs[0].data, self.inputs[1].data
-        dx0 = dy * x0
-        dx1 = dy * x1
+        dx0 = dy * x1
+        dx1 = dy * x0
         return dx0, dx1
 
 

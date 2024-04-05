@@ -30,9 +30,12 @@ def goldstein(x, y):
     )
 
 
-x = Variable(np.array(1.0))
-y = Variable(np.array(1.0))
-z = goldstein(x, y)
-z.backward()
+x0 = Variable(np.array(0.0))
+x1 = Variable(np.array(2.0))
+print(type(x0))
 
-print(x.grad, y.grad)
+y = sphere(x0, x1)
+
+y.backward(retain_grad=True)
+print(type(y.grad))
+print(type(x0.grad))

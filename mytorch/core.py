@@ -80,7 +80,7 @@ class Variable:
         self.creator = func
         self.generation = func.generation + 1
 
-    def zero_grad(self):
+    def cleargrad(self):
         self.grad = None
 
     def backward(self, retain_grad=False):
@@ -100,6 +100,8 @@ class Variable:
 
         while funcs:
             func = funcs.pop()
+
+            # backpropagation
             xs = func.inputs
             dys = [y().grad for y in func.outputs]
             dxs = func.backward(*dys)
@@ -142,6 +144,8 @@ Function : Base class of functions
 class Function:
     def __call__(self, *inputs):
         inputs = [as_variable(x) for x in inputs]
+
+        # forwardpropagation
         xs = [x.data for x in inputs]
         ys = self.forward(*xs)
         if not isinstance(ys, tuple):
@@ -150,9 +154,10 @@ class Function:
 
         if Config.enable_backprop:
             self.generation = max([x.generation for x in inputs])
+
+            # reference to the creator, inputs, and outputs
             for output in outputs:
                 output.set_creator(self)
-
             self.inputs = inputs
             self.outputs = [weakref.ref(output) for output in outputs]
 
@@ -163,6 +168,11 @@ class Function:
 
     def backward(self, *dys):
         raise NotImplementedError()
+
+
+"""
+Config
+"""
 
 
 class Config:
@@ -308,7 +318,7 @@ class Exp(Function):
         return y
 
     def backward(self, dy):
-        x = self.input.data
+        x = self.inputs[0].data
         dx = np.exp(x) * dy
         return dx
 
@@ -329,7 +339,7 @@ class Tanh(Function):
         return y
 
     def backward(self, dy):
-        x = self.input.data
+        x = self.inputs[0].data
         dx = dy * (1 - x**2)
         return dx
 
@@ -344,7 +354,7 @@ class Sigmoid(Function):
         return y
 
     def backward(self, dy):
-        x = self.input.data
+        x = self.inputs[0].data
         dx = dy * x * (1 - x)
         return dx
 
@@ -359,7 +369,7 @@ class ReLU(Function):
         return y
 
     def backward(self, dy):
-        x = self.input.data
+        x = self.inputs[0].data
         self.mask = (x > 0).astype(float)
         dx = dy * self.mask
         return dx

@@ -83,9 +83,9 @@ class Variable:
     def cleargrad(self):
         self.grad = None
 
-    def backward(self, retain_grad=False):
+    def backward(self, retain_grad=False, create_graph=False):
         if self.grad is None:
-            self.grad = np.ones_like(self.data)
+            self.grad = Variable(np.ones_like(self.data))
 
         funcs = []
         seen_set = set()
@@ -102,21 +102,22 @@ class Variable:
             func = funcs.pop()
 
             # backpropagation
-            xs = func.inputs
             dys = [y().grad for y in func.outputs]
-            dxs = func.backward(*dys)
 
-            if not isinstance(dxs, tuple):
-                dxs = (dxs,)
+            with using_config("enable_backprop", create_graph):
+                dxs = func.backward(*dys)
 
-            for x, dx in zip(xs, dxs):
-                if x.grad is None:
-                    x.grad = dx
-                else:
-                    x.grad = x.grad + dx  # Add gradient if x.grad already exists.
+                if not isinstance(dxs, tuple):
+                    dxs = (dxs,)
 
-                if x.creator:
-                    add_func(x.creator)
+                for x, dx in zip(func.inputs, dxs):
+                    if x.grad is None:
+                        x.grad = dx
+                    else:
+                        x.grad = x.grad + dx  # Add gradient if x.grad already exists.
+
+                    if x.creator:
+                        add_func(x.creator)
 
             if not retain_grad:
                 for y in func.outputs:
@@ -220,7 +221,7 @@ class Mul(Function):
         return y
 
     def backward(self, dy):
-        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        x0, x1 = self.inputs
         dx0 = dy * x1
         dx1 = dy * x0
         return dx0, dx1
@@ -266,7 +267,7 @@ class Div(Function):
         return y
 
     def backward(self, dy):
-        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        x0, x1 = self.inputs
         dx0 = dy / x1
         dx1 = -dy * (x0 / x1**2)
         return dx0, dx1
@@ -286,13 +287,13 @@ class Pow(Function):
         return y
 
     def backward(self, dy):
-        x = self.inputs[0].data
-        dx = dy * (self.c * x ** (self.c - 1))
+        (x,) = self.inputs
+        c = self.c
+        dx = c * x ** (c - 1) * dy
         return dx
 
 
 def pow(x, c):
-    x = as_array(x)
     return Pow(c)(x)
 
 
@@ -302,7 +303,7 @@ class Square(Function):
         return y
 
     def backward(self, dy):
-        x = self.inputs[0].data
+        (x,) = self.inputs
         dx = 2 * x * dy
         return dx
 
@@ -318,7 +319,7 @@ class Exp(Function):
         return y
 
     def backward(self, dy):
-        x = self.inputs[0].data
+        (x,) = self.inputs
         dx = np.exp(x) * dy
         return dx
 
@@ -326,6 +327,41 @@ class Exp(Function):
 def exp(x):
     x = as_array(x)
     return Exp()(x)
+
+
+"""
+Sin / Cos
+"""
+
+
+class Sin(Function):
+    def forward(self, x):
+        y = np.sin(x)
+        return y
+
+    def backward(self, dy):
+        (x,) = self.inputs
+        dx = dy * cos(x)
+        return dx
+
+
+def sin(x):
+    return Sin()(x)
+
+
+class Cos(Function):
+    def forward(self, x):
+        y = np.cos(x)
+        return y
+
+    def backward(self, dy):
+        (x,) = self.inputs
+        dx = -dy * sin(x)
+        return dx
+
+
+def cos(x):
+    return Cos()(x)
 
 
 """
@@ -339,8 +375,8 @@ class Tanh(Function):
         return y
 
     def backward(self, dy):
-        x = self.inputs[0].data
-        dx = dy * (1 - x**2)
+        y = self.outputs[0]()
+        dx = dy * (1 - y**2)
         return dx
 
 
@@ -354,8 +390,8 @@ class Sigmoid(Function):
         return y
 
     def backward(self, dy):
-        x = self.inputs[0].data
-        dx = dy * x * (1 - x)
+        y = self.outputs[0]()
+        dx = dy * y * (1 - y)
         return dx
 
 
@@ -369,7 +405,7 @@ class ReLU(Function):
         return y
 
     def backward(self, dy):
-        x = self.inputs[0].data
+        (x,) = self.inputs
         self.mask = (x > 0).astype(float)
         dx = dy * self.mask
         return dx

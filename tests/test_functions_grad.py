@@ -5,6 +5,7 @@ if "__file__" in globals():
 
 import numpy as np
 from mytorch import Variable
+from mytorch.core import sin
 
 
 def sphere(x, y):
@@ -30,12 +31,24 @@ def goldstein(x, y):
     )
 
 
-x0 = Variable(np.array(0.0))
-x1 = Variable(np.array(2.0))
-print(type(x0))
+def f(x):
+    y = x**4 - 2 * x**2
+    return y
 
-y = sphere(x0, x1)
 
-y.backward(retain_grad=True)
-print(type(y.grad))
-print(type(x0.grad))
+x = Variable(np.array(2.0))
+iters = 8
+
+for i in range(iters):
+    print(i, x)
+
+    y = f(x)
+    x.cleargrad()
+    y.backward(create_graph=True)
+
+    dx = x.grad
+    x.cleargrad()
+    dx.backward()
+    dx2 = x.grad
+
+    x.data -= dx.data / dx2.data

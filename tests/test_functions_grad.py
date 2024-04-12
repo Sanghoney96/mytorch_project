@@ -5,7 +5,6 @@ if "__file__" in globals():
 
 import numpy as np
 from mytorch import Variable
-from mytorch.core import sin
 import mytorch.functions as F
 
 

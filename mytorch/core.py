@@ -89,6 +89,9 @@ class Variable:
     def T(self):
         return mytorch.functions.transpose(self)
 
+    def sum(self, axis=None, keepdims=False):
+        return mytorch.functions.sum(self, axis, keepdims)
+
     def set_creator(self, func):
         self.creator = func
         self.generation = func.generation + 1
@@ -214,12 +217,15 @@ Operations : Add, Mul, Neg, Sub, Div, Pow, Square
 
 class Add(Function):
     def forward(self, x0, x1):
+        self.x0_shape, self.x1_shape = x0.shape, x1.shape
         y = x0 + x1
         return y
 
     def backward(self, dy):
-        dx0 = dy
-        dx1 = dy
+        dx0, dx1 = dy, dy
+        if self.x0_shape != self.x1_shape:
+            dx0 = mytorch.utils.sum_to(dx0, self.x0_shape)
+            dx1 = mytorch.utils.sum_to(dx1, self.x1_shape)
         return dx0, dx1
 
 
@@ -237,6 +243,9 @@ class Mul(Function):
         x0, x1 = self.inputs
         dx0 = dy * x1
         dx1 = dy * x0
+        if x0.shape != x1.shape:
+            dx0 = mytorch.utils.sum_to(dx0, x0.shape)
+            dx1 = mytorch.utils.sum_to(dx1, x1.shape)
         return dx0, dx1
 
 
@@ -260,12 +269,15 @@ def neg(x):
 
 class Sub(Function):
     def forward(self, x0, x1):
+        self.x0_shape, self.x1_shape = x0.shape, x1.shape
         y = x0 - x1
         return y
 
     def backward(self, dy):
-        dx0 = dy
-        dx1 = -dy
+        dx0, dx1 = dy, -dy
+        if self.x0_shape != self.x1_shape:
+            dx0 = mytorch.utils.sum_to(dx0, self.x0_shape)
+            dx1 = mytorch.utils.sum_to(dx1, self.x1_shape)
         return dx0, dx1
 
 
@@ -283,6 +295,9 @@ class Div(Function):
         x0, x1 = self.inputs
         dx0 = dy / x1
         dx1 = -dy * (x0 / x1**2)
+        if x0.shape != x1.shape:
+            dx0 = mytorch.utils.sum_to(dx0, x0.shape)
+            dx1 = mytorch.utils.sum_to(dx1, x1.shape)
         return dx0, dx1
 
 

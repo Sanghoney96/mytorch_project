@@ -1,5 +1,6 @@
 import numpy as np
 from mytorch.core import Variable, Function, as_array, as_variable
+from mytorch.utils import sum_to, reshape_sum_backward
 
 
 """
@@ -105,7 +106,7 @@ def relu(x):
 
 
 """
-Tensor operations : Reshape, Transpose, Sum
+Tensor operations : Reshape, Transpose, BroadcastTo, SumTo, Sum, Matmul
 """
 
 
@@ -146,3 +147,79 @@ class Transpose(Function):
 
 def transpose(x, axes=None):
     return Transpose(axes)(x)
+
+
+class BroadcastTo(Function):
+    def __init__(self, shape):
+        self.shape = shape
+
+    def forward(self, x):
+        self.x_shape = x.shape
+        y = np.broadcast_to(x, self.shape)
+        return y
+
+    def backward(self, dy):
+        dx = sum_to(dy, self.x_shape)
+        return dx
+
+
+def broadcast_to(x, shape):
+    if x.shape == shape:
+        return as_variable(x)
+    return BroadcastTo(shape)(x)
+
+
+class SumTo(Function):
+    def __init__(self, shape):
+        self.shape = shape
+
+    def forward(self, x):
+        self.x_shape = x.shape
+        y = sum_to(x, self.shape)
+        return y
+
+    def backward(self, dy):
+        dx = broadcast_to(dy, self.x_shape)
+        return dx
+
+
+def sum_to(x, shape):
+    if x.shape == shape:
+        return as_variable(x)
+    return SumTo(shape)(x)
+
+
+class Sum(Function):
+    def __init__(self, axis=None, keepdims=False):
+        self.axis = axis
+        self.keepdims = keepdims
+
+    def forward(self, x):
+        self.x_shape = x.shape
+        y = np.sum(x, axis=self.axis, keepdims=self.keepdims)
+        return y
+
+    def backward(self, dy):
+        dy = reshape_sum_backward(dy, self.x_shape, self.axis, self.keepdims)
+        dx = broadcast_to(dy, self.x_shape)
+        return dx
+
+
+def sum(x, axis=None, keepdims=False):
+    return Sum(axis, keepdims)(x)
+
+
+class Matmul(Function):
+    def forward(self, x, W):
+        y = np.dot(x, W)
+        return y
+
+    def backward(self, dy):
+        x, W = self.inputs
+        dx = matmul(dy, W.T)
+        dW = matmul(x.T, dy)
+        return dx, dW
+
+
+def matmul(x, W):
+    return Matmul()(x, W)

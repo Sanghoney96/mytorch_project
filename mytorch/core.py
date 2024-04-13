@@ -92,6 +92,12 @@ class Variable:
     def sum(self, axis=None, keepdims=False):
         return mytorch.functions.sum(self, axis, keepdims)
 
+    def squeeze(self, axis):
+        return mytorch.functions.squeeze(self, axis)
+
+    def expand_dims(self, axis):
+        return mytorch.functions.expand_dims(self, axis)
+
     def set_creator(self, func):
         self.creator = func
         self.generation = func.generation + 1

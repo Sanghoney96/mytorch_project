@@ -149,6 +149,39 @@ def transpose(x, axes=None):
     return Transpose(axes)(x)
 
 
+class Squeeze(Function):
+    def __init__(self, axis):
+        self.axis = axis
+
+    def forward(self, x):
+        y = np.squeeze(x, axis=self.axis)
+        return y
+
+    def backward(self, dy):
+        dx = expand_dims(dy, self.axis)
+        return dx
+
+
+def squeeze(x, axis):
+    return Squeeze(axis)(x)
+
+
+class ExpandDims(Function):
+    def __init__(self, axis):
+        self.axis = axis
+
+    def forward(self, x):
+        y = np.expand_dims(x, axis=self.axis)
+        return y
+
+    def backward(self, dy):
+        return squeeze(dy, self.axis)
+
+
+def expand_dims(x, axis):
+    return ExpandDims(axis)(x)
+
+
 class BroadcastTo(Function):
     def __init__(self, shape):
         self.shape = shape
@@ -223,3 +256,20 @@ class Matmul(Function):
 
 def matmul(x, W):
     return Matmul()(x, W)
+
+
+class MSE(Function):
+    def forward(self, y, y_hat):
+        diff = y - y_hat
+        j = np.sum(diff**2) / diff.shape[0]
+        return j
+
+    def backward(self, dj):
+        y, y_hat = self.inputs
+        dy = dj * 2 * (y - y_hat) / y.shape[0]
+        dy_hat = -dy
+        return dy, dy_hat
+
+
+def mse(y, y_hat):
+    return MSE()(y, y_hat)

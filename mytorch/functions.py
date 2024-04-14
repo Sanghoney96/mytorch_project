@@ -96,8 +96,8 @@ class ReLU(Function):
 
     def backward(self, dy):
         (x,) = self.inputs
-        self.mask = (x > 0).astype(float)
-        dx = dy * self.mask
+        mask = (x.data > 0).astype(float)
+        dx = dy * mask
         return dx
 
 
@@ -258,6 +258,11 @@ def matmul(x, W):
     return Matmul()(x, W)
 
 
+"""
+Loss functions: MSE, BCE(Binary Crossentropy), CCE(Categorical Crossentropy)
+"""
+
+
 class MSE(Function):
     def forward(self, y, y_hat):
         diff = y - y_hat
@@ -273,3 +278,31 @@ class MSE(Function):
 
 def mse(y, y_hat):
     return MSE()(y, y_hat)
+
+
+"""
+Layers
+"""
+
+
+class Linear(Function):
+    def forward(self, x, W, b):
+        y = np.dot(x, W)
+        if b is not None:
+            y += b
+        return y
+
+    def backward(self, dy):
+        x, W, b = self.inputs
+        dx = matmul(dy, W.T)
+        dW = matmul(x.T, dy)
+        if b.data is None:
+            db = None
+        else:
+            db = sum(dy, axis=0)
+
+        return dx, dW, db
+
+
+def linear(x, W, b):
+    return Linear()(x, W, b)

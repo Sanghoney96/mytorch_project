@@ -19,7 +19,7 @@ lr = 0.1
 iters = 100
 
 for i in range(iters):
-    y_pred = F.matmul(x, W) + b
+    y_pred = F.linear(x, W, b)
     loss = F.mse(y, y_pred)
 
     W.cleargrad()

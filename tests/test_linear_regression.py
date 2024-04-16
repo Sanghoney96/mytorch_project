@@ -5,29 +5,29 @@ if "__file__" in globals():
 
 import numpy as np
 import mytorch.functions as F
-from mytorch import Variable
-
+import mytorch.layers as L
+import mytorch.models as M
+from mytorch import Layer, optimizers
 
 x = np.random.rand(100, 1)
-y = 5 + 2 * x + np.random.rand(100, 1)
-
-W = Variable(np.random.rand(1, 1))
-b = Variable(np.random.rand(1))
+y = np.sin(2 * np.pi * x) + np.random.rand(100, 1)
 
 
-lr = 0.1
-iters = 100
+lr = 0.2
+max_iter = 10000
 
-for i in range(iters):
-    y_pred = F.linear(x, W, b)
+model = M.MLP((10, 10, 1))
+optimizer = optimizers.SGD(lr)
+optimizer.setup(model)
+
+for i in range(max_iter):
+    y_pred = model(x)
     loss = F.mse(y, y_pred)
 
-    W.cleargrad()
-    b.cleargrad()
-    loss.backward(create_graph=False)
+    model.cleargrads()
+    loss.backward()
 
-    W.data -= lr * W.grad.data
-    b.data -= lr * b.grad.data
+    optimizer.update()
 
-    if i % 10 == 9:
-        print(W, b, loss.data)
+    if i % 1000 == 0:
+        print(loss)

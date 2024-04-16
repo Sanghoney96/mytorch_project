@@ -1,17 +1,39 @@
 import numpy as np
 
 
-class SGD:
-    def __init__(self, lr, weight_decay=0):
+class Optimizer:
+    def __init__(self):
+        self.target = None
+        self.hooks = []  # preprocessing functions (ex : weight decay, ...)
+
+    # Set model or layer as target
+    def setup(self, target):
+        self.target = target
+        return self
+
+    def update(self):
+        params = [p for p in self.target.params() if p.grad is not None]
+
+        for f in self.hooks:
+            f(params)
+
+        for param in params:
+            self.step(param)
+
+    def step(self, param):
+        raise NotImplementedError
+
+    def add_hook(self, f):
+        self.hooks.append(f)
+
+
+class SGD(Optimizer):
+    def __init__(self, lr):
+        super().__init__()
         self.lr = lr
-        self.decay = weight_decay
 
-    def step(self, params, grads):
-        for key in params.keys():
-            if self.decay != 0:
-                grads[key] += self.decay * params[key]
-
-            params[key] -= self.lr * grads[key]
+    def step(self, param):
+        param.data -= self.lr * param.grad.data
 
 
 class MomentumSGD:

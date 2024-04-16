@@ -1,58 +1,69 @@
 import numpy as np
+from mytorch.core import Parameter
+import mytorch.functions as F
+import weakref
 
 
-class Linear:
-    def __init__(self, features_in, features_out, weight_initializer="glorot"):
-        if weight_initializer == "glorot":
-            self.W = np.random.randn(features_in, features_out) * np.sqrt(
-                1 / features_in
-            )
-        elif weight_initializer == "he":
-            self.W = np.random.randn(features_in, features_out) * np.sqrt(
-                2 / features_in
-            )
-        self.b = np.zeros((1, features_out))
+class Layer:
+    def __init__(self):
+        self._params = set()
 
-        self.X = None
-        self.dW = None
-        self.db = None
+    def __setattr__(self, name, value):
+        if isinstance(value, (Parameter, Layer)):
+            self._params.add(name)
+        super().__setattr__(name, value)
 
-    def forward(self, X):
-        self.X = X
-        Z = np.dot(self.X, self.W) + self.b
+    def __call__(self, *inputs):
+        outputs = self.forward(*inputs)
+        if not isinstance(outputs, tuple):
+            outputs = (outputs,)
+        self.inputs = [weakref.ref(x) for x in inputs]
+        self.outputs = [weakref.ref(y) for y in outputs]
+        return outputs if len(outputs) > 1 else outputs[0]
 
-        return Z
+    def forward(self, inputs):
+        raise NotImplementedError()
 
-    def backward(self, dZ):
-        dX = np.dot(dZ, self.W.T)
-        self.dW = np.dot(self.X.T, dZ)
-        self.db = np.sum(dZ, axis=0)
+    def params(self):
+        for name in self._params:
+            obj = self.__dict__[name]
 
-        return dX
+            if isinstance(obj, Layer):
+                yield from obj.params()
+            else:
+                yield obj
+
+    def cleargrads(self):
+        for param in self.params():
+            param.cleargrad()
 
 
-class Dropout:
-    def __init__(self, ratio=0.5):
-        self.ratio = ratio
-        self.mask = None
+class Linear(Layer):
+    def __init__(self, out_size, no_bias=False, dtype=np.float32, in_size=None):
+        super().__init__()
+        self.in_size = in_size
+        self.out_size = out_size
+        self.dtype = dtype
 
-    def forward(self, X, training=True):
-        if training:
-            self.mask = (np.random.rand(*X.shape) > self.ratio).astype(float)
-            return X * self.mask
+        self.W = Parameter(None, name="W")
+        if self.in_size is not None:
+            self._init_W()
+
+        if no_bias:
+            self.b = None
         else:
-            return X * (1 - self.ratio)
+            self.b = Parameter(np.zeros(out_size, dtype=dtype), name="b")
 
-    def backward(self, dX):
-        return dX * self.mask
+    def _init_W(self):
+        I, O = self.in_size, self.out_size
+        W_data = np.random.randn(I, O).astype(self.dtype) * np.sqrt(1 / I)
+        self.W.data = W_data
 
+    def forward(self, x):
+        if self.W.data is None:
+            self.in_size = x.shape[1]
+            self._init_W()
 
-# Dropout test
-X = np.random.randn(2, 5)
-dropout = Dropout()
-print("X:")
-print(X)
-print("Forward:")
-print(dropout.forward(X))
-print("Backward:")
-print(dropout.backward(np.ones_like(X)))
+        y = F.linear(x, self.W, self.b)
+
+        return y

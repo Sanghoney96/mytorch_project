@@ -160,6 +160,15 @@ def as_array(x):
 
 
 """
+Parameter
+"""
+
+
+class Parameter(Variable):
+    pass
+
+
+"""
 Function : Base class of functions
 """
 

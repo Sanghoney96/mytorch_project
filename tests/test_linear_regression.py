@@ -6,8 +6,8 @@ if "__file__" in globals():
 import numpy as np
 import mytorch.functions as F
 import mytorch.layers as L
-import mytorch.models as M
-from mytorch import Layer, optimizers
+from mytorch.models import MLP
+from mytorch.optimizers import SGD, MomentumSGD
 
 x = np.random.rand(100, 1)
 y = np.sin(2 * np.pi * x) + np.random.rand(100, 1)
@@ -16,8 +16,8 @@ y = np.sin(2 * np.pi * x) + np.random.rand(100, 1)
 lr = 0.2
 max_iter = 10000
 
-model = M.MLP((10, 10, 1))
-optimizer = optimizers.SGD(lr)
+model = MLP((10, 10, 1))
+optimizer = MomentumSGD(lr)
 optimizer.setup(model)
 
 for i in range(max_iter):

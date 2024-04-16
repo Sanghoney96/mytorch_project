@@ -36,25 +36,21 @@ class SGD(Optimizer):
         param.data -= self.lr * param.grad.data
 
 
-class MomentumSGD:
-    def __init__(self, lr, momentum=0.9, weight_decay=0):
+class MomentumSGD(Optimizer):
+    def __init__(self, lr, momentum=0.9):
+        super().__init__()
         self.lr = lr
         self.momentum = momentum
-        self.decay = weight_decay
-        self.v = None
+        self.vs = {}
 
-    def step(self, params, grads):
-        if self.v is None:
-            self.v = {}
-            for key, val in params.items():
-                self.v[key] = np.zeros_like(val)
+    def step(self, param):
+        v_key = id(param)
+        if v_key not in self.vs:
+            self.vs[v_key] = np.zeros_like(param.data)
 
-        for key in params.keys():
-            if self.decay != 0:
-                grads[key] += self.decay * params[key]
-
-            self.v[key] = self.momentum * self.v[key] - self.lr * grads[key]
-            params[key] += self.v[key]
+        v = self.vs[v_key]
+        v = self.momentum * v - self.lr * param.grad.data
+        param.data += v
 
 
 class AdaGrad:

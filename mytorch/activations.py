@@ -1,46 +1,6 @@
 import numpy as np
 
 
-class Sigmoid:
-    def __init__(self):
-        self.A = None
-
-    def forward(self, Z):
-        self.A = 1 / (1 + np.exp(-Z))
-        return self.A
-
-    def backward(self, dA):
-        dZ = dA * self.A * (1 - self.A)
-        return dZ
-
-
-class Tanh:
-    def __init__(self):
-        self.A = None
-
-    def forward(self, Z):
-        self.A = np.tanh(Z)
-        return self.A
-
-    def backward(self, dA):
-        dZ = dA * (1 - self.A**2)
-        return dZ
-
-
-class ReLU:
-    def __init__(self):
-        self.mask = None
-
-    def forward(self, Z):
-        self.A = np.maximum(0, Z)
-        self.mask = (Z > 0).astype(float)
-        return self.A
-
-    def backward(self, dA):
-        dZ = dA * self.mask
-        return dZ
-
-
 class Softmax:
     def __init__(self):
         self.Y_hat = None

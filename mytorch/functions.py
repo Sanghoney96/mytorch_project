@@ -105,6 +105,27 @@ def relu(x):
     return ReLU()(x)
 
 
+class Softmax(Function):
+    def __init__(self, axis=1):
+        self.axis = axis
+
+    def forward(self, x):
+        x_max = np.max(x, axis=self.axis, keepdims=True)
+        exp_x = np.exp(x - x_max)
+        y = exp_x / np.sum(exp_x, axis=self.axis, keepdims=True)
+        return y
+
+    def backward(self, dy):
+        y = self.outputs[0]()
+        dx = y * (dy - sum(y * dy, axis=self.axis, keepdims=True))
+
+        return dx
+
+
+def softmax(x, axis=1):
+    return Softmax(axis)(x)
+
+
 """
 Tensor operations : Reshape, Transpose, BroadcastTo, SumTo, Sum, Matmul
 """
@@ -180,6 +201,37 @@ class ExpandDims(Function):
 
 def expand_dims(x, axis):
     return ExpandDims(axis)(x)
+
+
+class GetItem(Function):
+    def __init__(self, slices):
+        self.slices = slices
+
+    def forward(self, x):
+        y = x[self.slices]
+        return y
+
+    def backward(self, dy):
+        (x,) = self.inputs
+        return GetItemGrad(self.slices, x.shape)(dy)
+
+
+class GetItemGrad(Function):
+    def __init__(self, slices, in_shape):
+        self.slices = slices
+        self.in_shape = in_shape
+
+    def forward(self, dy):
+        dx = np.zeros(self.in_shape)
+        np.add.at(dx, self.slices, dy)
+        return dx
+
+    def backward(self, ddx):
+        return get_item(ddx, self.slices)
+
+
+def get_item(x, slices):
+    return GetItem(slices)(x)
 
 
 class BroadcastTo(Function):
@@ -278,6 +330,35 @@ class MSE(Function):
 
 def mse(y, y_hat):
     return MSE()(y, y_hat)
+
+
+class CrossEntropyLoss(Function):
+    def forward(self, l, t):
+        N = l.shape[0]
+
+        # softmax
+        l_max = np.max(l, axis=1, keepdims=True)
+        exp_l = np.exp(l - l_max)
+        p = exp_l / np.sum(exp_l, axis=1, keepdims=True)
+
+        # cross entropy
+        log_p = np.log(p + 1e-7)
+        log_p = log_p[np.arange(N), t.ravel()]
+        j = -np.sum(log_p) / N
+        return j
+
+    def backward(self, dj):
+        l, t = self.inputs
+        N, K = l.shape
+
+        p = softmax(l)
+        t_onehot = np.eye(K, dtype=t.dtype)[t.data]  # convert to one-hot
+        dl = (p - t_onehot) * dj / N
+        return dl
+
+
+def crossentropy_loss(l, t):
+    return CrossEntropyLoss()(l, t)
 
 
 """

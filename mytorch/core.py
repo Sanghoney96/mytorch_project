@@ -77,6 +77,9 @@ class Variable:
     def __neg__(self):
         return neg(self)
 
+    def __getitem__(self, slices):
+        return mytorch.functions.get_item(self, slices)
+
     def reshape(self, *shape):
         if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
             shape = shape[0]

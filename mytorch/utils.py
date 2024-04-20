@@ -1,4 +1,5 @@
 import numpy as np
+from mytorch.core import as_variable
 
 
 def sum_to(x, shape):
@@ -30,3 +31,11 @@ def reshape_sum_backward(gy, x_shape, axis, keepdims):
 
     gy = gy.reshape(shape)  # reshape
     return gy
+
+
+def accuracy(y_pred, y):
+    y_pred, y = as_variable(y_pred), as_variable(y)
+
+    pred = y_pred.data.argmax(axis=1).reshape(y.shape)
+    acc = (pred == y.data).mean()
+    return acc

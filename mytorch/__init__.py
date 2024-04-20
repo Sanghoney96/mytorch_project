@@ -9,3 +9,5 @@ from mytorch.core import Config
 
 from mytorch.layers import Layer
 from mytorch.models import Model
+
+from mytorch.dataloader import DataLoader

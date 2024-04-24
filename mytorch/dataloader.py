@@ -1,5 +1,10 @@
 import math
-import random
+
+pil_available = True
+try:
+    from PIL import Image
+except:
+    pil_available = False
 import numpy as np
 from mytorch.dataset import Dataset
 

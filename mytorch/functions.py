@@ -1,6 +1,7 @@
 import numpy as np
+import mytorch
 from mytorch.core import Variable, Function, as_array, as_variable
-from mytorch.utils import sum_to, reshape_sum_backward
+from mytorch import cuda, utils
 
 
 """
@@ -10,12 +11,13 @@ Exp, Sin, Cos
 
 class Exp(Function):
     def forward(self, x):
-        y = np.exp(x)
+        xp = cuda.get_array_module(x)
+        y = xp.exp(x)
         return y
 
     def backward(self, dy):
-        (x,) = self.inputs
-        dx = np.exp(x) * dy
+        y = self.outputs[0]()
+        dx = y * dy
         return dx
 
 
@@ -26,7 +28,8 @@ def exp(x):
 
 class Sin(Function):
     def forward(self, x):
-        y = np.sin(x)
+        xp = cuda.get_array_module(x)
+        y = xp.sin(x)
         return y
 
     def backward(self, dy):
@@ -41,7 +44,8 @@ def sin(x):
 
 class Cos(Function):
     def forward(self, x):
-        y = np.cos(x)
+        xp = cuda.get_array_module(x)
+        y = xp.cos(x)
         return y
 
     def backward(self, dy):
@@ -61,7 +65,8 @@ Activation functions
 
 class Tanh(Function):
     def forward(self, x):
-        y = np.tanh(x)
+        xp = cuda.get_array_module(x)
+        y = xp.tanh(x)
         return y
 
     def backward(self, dy):
@@ -76,7 +81,8 @@ def tanh(x):
 
 class Sigmoid(Function):
     def forward(self, x):
-        y = 1 / (1 + np.exp(-x))
+        xp = cuda.get_array_module(x)
+        y = 1 / (1 + xp.exp(-x))
         return y
 
     def backward(self, dy):
@@ -91,7 +97,8 @@ def sigmoid(x):
 
 class ReLU(Function):
     def forward(self, x):
-        y = np.maximum(0, x)
+        xp = cuda.get_array_module(x)
+        y = xp.maximum(0, x)
         return y
 
     def backward(self, dy):
@@ -110,9 +117,10 @@ class Softmax(Function):
         self.axis = axis
 
     def forward(self, x):
-        x_max = np.max(x, axis=self.axis, keepdims=True)
-        exp_x = np.exp(x - x_max)
-        y = exp_x / np.sum(exp_x, axis=self.axis, keepdims=True)
+        xp = cuda.get_array_module(x)
+        x_max = xp.max(x, axis=self.axis, keepdims=True)
+        exp_x = xp.exp(x - x_max)
+        y = exp_x / xp.sum(exp_x, axis=self.axis, keepdims=True)
         return y
 
     def backward(self, dy):
@@ -155,7 +163,7 @@ class Transpose(Function):
         self.axes = axes
 
     def forward(self, x):
-        y = np.transpose(x, self.axes)
+        y = x.transpose(self.axes)
         return y
 
     def backward(self, dy):
@@ -175,7 +183,7 @@ class Squeeze(Function):
         self.axis = axis
 
     def forward(self, x):
-        y = np.squeeze(x, axis=self.axis)
+        y = x.squeeze(axis=self.axis)
         return y
 
     def backward(self, dy):
@@ -192,7 +200,7 @@ class ExpandDims(Function):
         self.axis = axis
 
     def forward(self, x):
-        y = np.expand_dims(x, axis=self.axis)
+        y = x.expand_dims(axis=self.axis)
         return y
 
     def backward(self, dy):
@@ -222,8 +230,13 @@ class GetItemGrad(Function):
         self.in_shape = in_shape
 
     def forward(self, dy):
-        dx = np.zeros(self.in_shape)
-        np.add.at(dx, self.slices, dy)
+        xp = cuda.get_array_module(dy)
+        dx = xp.zeros(self.in_shape)
+
+        if xp is np:
+            np.add.at(dx, self.slices, dy)
+        else:
+            xp.scatter_add(dx, self.slices, dy)
         return dx
 
     def backward(self, ddx):
@@ -240,7 +253,8 @@ class BroadcastTo(Function):
 
     def forward(self, x):
         self.x_shape = x.shape
-        y = np.broadcast_to(x, self.shape)
+        xp = cuda.get_array_module(x)
+        y = xp.broadcast_to(x, self.shape)
         return y
 
     def backward(self, dy):
@@ -260,7 +274,7 @@ class SumTo(Function):
 
     def forward(self, x):
         self.x_shape = x.shape
-        y = sum_to(x, self.shape)
+        y = utils.sum_to(x, self.shape)
         return y
 
     def backward(self, dy):
@@ -281,11 +295,11 @@ class Sum(Function):
 
     def forward(self, x):
         self.x_shape = x.shape
-        y = np.sum(x, axis=self.axis, keepdims=self.keepdims)
+        y = x.sum(axis=self.axis, keepdims=self.keepdims)
         return y
 
     def backward(self, dy):
-        dy = reshape_sum_backward(dy, self.x_shape, self.axis, self.keepdims)
+        dy = utils.reshape_sum_backward(dy, self.x_shape, self.axis, self.keepdims)
         dx = broadcast_to(dy, self.x_shape)
         return dx
 
@@ -296,7 +310,7 @@ def sum(x, axis=None, keepdims=False):
 
 class Matmul(Function):
     def forward(self, x, W):
-        y = np.dot(x, W)
+        y = x.dot(W)
         return y
 
     def backward(self, dy):
@@ -318,7 +332,7 @@ Loss functions: MSE, BCE(Binary Crossentropy), CCE(Categorical Crossentropy)
 class MSE(Function):
     def forward(self, y, y_hat):
         diff = y - y_hat
-        j = np.sum(diff**2) / diff.shape[0]
+        j = (diff**2).sum() / diff.shape[0]
         return j
 
     def backward(self, dj):
@@ -335,16 +349,17 @@ def mse(y, y_hat):
 class CrossEntropyLoss(Function):
     def forward(self, l, t):
         N = l.shape[0]
+        xp = cuda.get_array_module(l)
 
         # softmax
-        l_max = np.max(l, axis=1, keepdims=True)
-        exp_l = np.exp(l - l_max)
-        p = exp_l / np.sum(exp_l, axis=1, keepdims=True)
+        l_max = xp.max(l, axis=1, keepdims=True)
+        exp_l = xp.exp(l - l_max)
+        p = exp_l / xp.sum(exp_l, axis=1, keepdims=True)
 
         # cross entropy
-        log_p = np.log(p + 1e-7)
-        log_p = log_p[np.arange(N), t.ravel()]
-        j = -np.sum(log_p) / N
+        log_p = xp.log(p + 1e-7)
+        log_p = log_p[xp.arange(N), t.ravel()]
+        j = -xp.sum(log_p) / N
         return j
 
     def backward(self, dj):
@@ -352,7 +367,9 @@ class CrossEntropyLoss(Function):
         N, K = l.shape
 
         p = softmax(l)
-        t_onehot = np.eye(K, dtype=t.dtype)[t.data]  # convert to one-hot
+
+        xp = cuda.get_array_module(t.data)
+        t_onehot = xp.eye(K, dtype=t.dtype)[t.data]  # convert to one-hot
         dl = (p - t_onehot) * dj / N
         return dl
 
@@ -368,7 +385,7 @@ Layers
 
 class Linear(Function):
     def forward(self, x, W, b):
-        y = np.dot(x, W)
+        y = x.dot(W)
         if b is not None:
             y += b
         return y
@@ -387,3 +404,32 @@ class Linear(Function):
 
 def linear(x, W, b):
     return Linear()(x, W, b)
+
+
+class Dropout(Function):
+    def __init__(self, p=0.5):
+        self.dropout_ratio = p
+
+    def forward(self, x):
+        if mytorch.Config.train:
+            xp = cuda.get_array_module(x)
+            mask = xp.random.rand(*x.shape) > self.dropout_ratio
+            scale = 1 - self.dropout_ratio
+            y = x * mask / scale
+            return y
+        else:
+            return x
+
+    def backward(self, dy):
+        if mytorch.Config.train:
+            y = self.outputs[0]()
+            mask = (y.data != 0).astype(float)
+            scale = 1 - self.dropout_ratio
+            dx = dy * mask / scale
+            return dx
+        else:
+            return dy
+
+
+def dropout(x, p=0.5):
+    return Dropout(p)(x)

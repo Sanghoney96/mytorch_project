@@ -112,11 +112,5 @@ def get_file(url, file_name=None):
 # =============================================================================
 
 
-def pair(x):
-    if isinstance(x, int):
-        return (x, x)
-    elif isinstance(x, tuple):
-        assert len(x) == 2
-        return x
-    else:
-        raise ValueError
+def get_conv_size(input_size, kernel_size, pad, stride):
+    return (input_size - kernel_size + 2 * pad) // stride + 1

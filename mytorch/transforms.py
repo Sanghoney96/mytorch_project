@@ -4,7 +4,6 @@ try:
     import Image
 except ImportError:
     from PIL import Image
-from mytorch.utils import pair
 
 
 class Compose:

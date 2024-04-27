@@ -3,6 +3,12 @@ import weakref
 from contextlib import contextmanager
 import mytorch
 
+try:
+    import cupy
+
+    array_types = (np.ndarray, cupy.ndarray)
+except ImportError:
+    array_types = np.ndarray
 
 """
 Variable : Contain input data.
@@ -11,7 +17,7 @@ Variable : Contain input data.
 
 class Variable:
     def __init__(self, data, name=None):
-        if (data is not None) and (not isinstance(data, np.ndarray)):
+        if (data is not None) and (not isinstance(data, array_types)):
             raise TypeError(f"{type(data)} is not supported")
 
         self.name = name
@@ -108,9 +114,18 @@ class Variable:
     def cleargrad(self):
         self.grad = None
 
+    def to_cpu(self):
+        if self.data is not None:
+            self.data = mytorch.cuda.as_numpy(self.data)
+
+    def to_gpu(self):
+        if self.data is not None:
+            self.data = mytorch.cuda.as_cupy(self.data)
+
     def backward(self, retain_grad=False, create_graph=False):
         if self.grad is None:
-            self.grad = Variable(np.ones_like(self.data))
+            xp = mytorch.cuda.get_array_module(self.data)
+            self.grad = Variable(xp.ones_like(self.data))
 
         funcs = []
         seen_set = set()
@@ -156,9 +171,9 @@ def as_variable(obj):
         return Variable(obj)
 
 
-def as_array(x):
+def as_array(x, array_module=np):
     if np.isscalar(x):
-        return np.array(x)
+        return array_module.array(x)
     return x
 
 
@@ -212,6 +227,7 @@ Config
 
 class Config:
     enable_backprop = True
+    train = True
 
 
 @contextmanager
@@ -222,6 +238,10 @@ def using_config(name, value):
         yield
     finally:
         setattr(Config, name, old_value)
+
+
+def test_mode():
+    return using_config("train", False)
 
 
 def no_grad():
@@ -248,7 +268,7 @@ class Add(Function):
 
 
 def add(x0, x1):
-    x1 = as_array(x1)
+    x1 = as_array(x1, mytorch.cuda.get_array_module(x0.data))
     return Add()(x0, x1)
 
 
@@ -268,7 +288,7 @@ class Mul(Function):
 
 
 def mul(x0, x1):
-    x1 = as_array(x1)
+    x1 = as_array(x1, mytorch.cuda.get_array_module(x0.data))
     return Mul()(x0, x1)
 
 
@@ -281,7 +301,7 @@ class Neg(Function):
 
 
 def neg(x):
-    x = as_array(x)
+    x = as_array(x, mytorch.cuda.get_array_module(x.data))
     return Neg()(x)
 
 
@@ -300,7 +320,8 @@ class Sub(Function):
 
 
 def sub(x0, x1):
-    x0, x1 = as_array(x0), as_array(x1)
+    x0 = as_array(x0, mytorch.cuda.get_array_module(x1.data))
+    x1 = as_array(x1, mytorch.cuda.get_array_module(x0.data))
     return Sub()(x0, x1)
 
 
@@ -355,5 +376,5 @@ class Square(Function):
 
 
 def square(x):
-    x = as_array(x)
+    x = as_array(x, mytorch.cuda.get_array_module(x.data))
     return Square()(x)
